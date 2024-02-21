@@ -1,5 +1,5 @@
 use crate::constants::*;
-use crate::states::{Building, Town, Vector3D};
+use crate::states::{Building, Town, TownAccount, Vector3D};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
@@ -9,11 +9,14 @@ pub struct InsertHouse<'info> {
     signer: Signer<'info>,
 
     #[account(
+        mut,
         seeds = [constants::TOWN],
         bump,
     )]
     town: Account<'info, Town>,
     nft: Account<'info, Mint>,
+
+    pub system_program: Program<'info, System>,
 }
 
 pub fn insert_house_(
@@ -22,15 +25,15 @@ pub fn insert_house_(
     position: Vector3D,
     scale: Vector3D,
 ) -> Result<()> {
-    let nft = ctx.accounts.nft.key().to_string();
     let building = Building {
-        id: nft,
+        id: ctx.accounts.nft.key(),
         house_variant,
         position,
         scale,
     };
-    let buildings = &mut ctx.accounts.town.buildings;
-    buildings.push(building);
+    let town = &mut ctx.accounts.town;
+    town.insert_building(&ctx.accounts.signer, building, &ctx.accounts.system_program)?;
+
     msg!("building numbers: {}", ctx.accounts.town.buildings.len());
     return Ok(());
 }

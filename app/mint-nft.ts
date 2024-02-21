@@ -1,5 +1,5 @@
-import {loadKeypair, findAssociatedTokenAddress} from "./utils"
-import {createMint, mintTo} from "@solana/spl-token";
+import {findAssociatedTokenAddress, loadKeypair} from "./utils"
+import {createMint, getOrCreateAssociatedTokenAccount, mintTo} from "@solana/spl-token";
 import web3, {Keypair, PublicKey} from "@solana/web3.js";
 
 const endpoint = "http://localhost:8899"
@@ -22,21 +22,32 @@ export async function createMyMint() {
 export async function mintNft() {
     // const mint = await createMyMint()
     console.log("####minting NFT####")
-    const mint = new PublicKey("BaU4MkdjHRUQqHH1F1TkNmc3cmt4t6dJ2zDUHGGLnVNe")
+    const mint = new PublicKey("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
+    const destination = await getATA(mint, payer.publicKey)
 
-    const destination = findAssociatedTokenAddress(payer.publicKey, mint)
     const tx = await mintTo(
         connection,
         payer,
         mint,
-        destination,
+        destination.address,
         payer.publicKey,
         1
     )
 
     console.log({mint: mint.toBase58()})
+    console.log({tokenAccount: destination.address.toBase58()})
     console.log({mintTx: tx})
-    console.log({tokenAccount: destination})
 }
 
-// mint: BaU4MkdjHRUQqHH1F1TkNmc3cmt4t6dJ2zDUHGGLnVNe
+async function getATA(mint: PublicKey, owner: PublicKey) {
+    return await getOrCreateAssociatedTokenAccount(
+        connection,
+        payer,
+        mint,
+        owner
+    )
+}
+
+// mint: DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd
+// tokenAccount: 5RTS6WhVqdUPTD2G2Ku1xp1cVeATtZGCAA2AT2tzPWxR
+// mintTx: 34aPLy53bNicToM4cFkXnmwgGuqWwiTY3ArXWcv68FFexF5xeZrMeDvqVgrZfqhAe4CK5AgrPQ5JSFpUcvX3rnsW

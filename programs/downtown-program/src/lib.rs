@@ -5,7 +5,7 @@ mod states;
 use crate::instructions::*;
 use anchor_lang::prelude::*;
 
-declare_id!("jabBmTCmkEZoppxcW1CUNAxPoZPNHckfDTXZ3QZ4mjr");
+declare_id!("9GJX8vGPpVehVogPLV6btgpuTpeEFjw1Th6GfTVKhS32");
 
 #[program]
 pub mod downtown_program {
@@ -23,13 +23,8 @@ pub mod downtown_program {
         position_y: i64,
         position_z: i64,
     ) -> Result<()> {
-        let position = Vector3D {
-            x: position_x,
-            y: position_y,
-            z: position_z,
-        };
-
-        let scale = Vector3D { x: 1, y: 1, z: 1 };
+        let position = Vector3D::new(position_x, position_y, Some(position_z));
+        let scale = Vector3D::new(0, 0, Some(0));
 
         insert_house_(ctx, house_variant, position, scale)
     }

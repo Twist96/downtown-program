@@ -1,4 +1,4 @@
-use crate::constants::*;
+// use crate::constants::*;
 use crate::states::Town;
 use anchor_lang::prelude::*;
 
@@ -9,7 +9,7 @@ pub struct CreateTown<'info> {
 
     #[account(
         init_if_needed,
-        seeds = [constants::TOWN],
+        seeds = [Town::SEED_PREFIX.as_bytes()],
         bump,
         payer = signer,
         space = 8 + std::mem::size_of::<Town>()
@@ -19,7 +19,6 @@ pub struct CreateTown<'info> {
     system_program: Program<'info, System>,
 }
 pub fn create_town_(ctx: Context<CreateTown>, name: String) -> Result<()> {
-    ctx.accounts.town.name = name;
-    ctx.accounts.town.buildings = Vec::new();
+    ctx.accounts.town.set_inner(Town::new(name));
     Ok(())
 }

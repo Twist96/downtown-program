@@ -16,9 +16,7 @@ describe("downtown-program", () => {
       program.programId
   )
 
-  console.log({program___id: program.programId})
-
-  it.only("Create Town", async () => {
+  it("Create Town", async () => {
     const townName = "Downtown"
     const tx = await program.methods
         .createTown(townName)
@@ -26,17 +24,17 @@ describe("downtown-program", () => {
         .signers([payer.payer])
         .rpc();
 
-    console.log("Your transaction signature", tx);
     const town = await program.account.town.fetch(townAddress)
     console.log({town})
     assert(town.name === townName, `wrong name found: ${town.name}`)
+    assert(town.buildings.length === 0, "No building should be found")
   });
 
   it("Add house", async () => {
     const initTown = await program.account.town.fetch(townAddress)
     console.log({initTown})
     let positionX = new anchor.BN(0)
-    let nft = new PublicKey("BaU4MkdjHRUQqHH1F1TkNmc3cmt4t6dJ2zDUHGGLnVNe")
+    let nft = new PublicKey("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
 
     const tx = await program.methods
         .insertHouse(1, positionX, positionX, positionX)
@@ -49,10 +47,14 @@ describe("downtown-program", () => {
     console.assert(town.buildings.length === initTown.buildings.length + 1, "House was not added")
   })
 
-  it("Get town details", async () => {
+  it.only("Get town details", async () => {
     const initTown = await program.account.town.fetch(townAddress)
     console.log({town_name: initTown.name})
-    console.log({town_buildings: initTown.buildings})
+    let buildings = initTown.buildings
+    for (var building of buildings) {
+      console.log(building.id)
+      console.log(building.position)
+    }
     console.log({town_building_count: initTown.buildings.length})
   })
 
