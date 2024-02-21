@@ -1,3 +1,4 @@
+use std::str::FromStr;
 mod constants;
 mod instructions;
 mod states;
@@ -5,7 +6,7 @@ mod states;
 use crate::instructions::*;
 use anchor_lang::prelude::*;
 
-declare_id!("9GJX8vGPpVehVogPLV6btgpuTpeEFjw1Th6GfTVKhS32");
+declare_id!("EYY8UALu2JGiP5RmTACC5HBP8UbLzFEX4xEg3rEQPo1j");
 
 #[program]
 pub mod downtown_program {
@@ -27,5 +28,10 @@ pub mod downtown_program {
         let scale = Vector3D::new(0, 0, Some(0));
 
         insert_house_(ctx, house_variant, position, scale)
+    }
+
+    pub fn withdraw_house(ctx: Context<WithdrawHouse>, house_id: String) -> Result<()> {
+        let public_key = Pubkey::from_str(&house_id);
+        withdraw_house_(ctx, public_key.unwrap().key())
     }
 }

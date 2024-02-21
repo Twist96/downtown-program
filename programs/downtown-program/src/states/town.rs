@@ -1,3 +1,4 @@
+use crate::states::custom_error::CustomError;
 use crate::states::Building;
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
@@ -22,6 +23,7 @@ impl Town {
 
 pub trait TownAccount<'info> {
     fn check_key(&self, id: Pubkey) -> bool;
+    fn _get_building(&self, id: Pubkey) -> Result<Building>;
 
     fn insert_building(
         &mut self,
@@ -29,8 +31,17 @@ pub trait TownAccount<'info> {
         building: Building,
         system_program: &Program<'info, System>,
     ) -> Result<()>;
+
+    fn withdraw_building(
+        &mut self,
+        payer: &Signer<'info>,
+        building_id: Pubkey,
+        system_program: &Program<'info, System>,
+    ) -> Result<()>;
+
     fn realloc(
         &mut self,
+        action: ReallocAction,
         space_to_add: usize,
         payer: &Signer<'info>,
         system_program: &Program<'info, System>,
@@ -47,6 +58,15 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
         return false;
     }
 
+    fn _get_building(&self, id: Pubkey) -> Result<Building> {
+        for building in &self.buildings {
+            if building.id == id {
+                return Ok(building.clone());
+            }
+        }
+        return Err(CustomError::BuildingNotFound.into());
+    }
+
     fn insert_building(
         &mut self,
         payer: &Signer<'info>,
@@ -56,39 +76,117 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
         match self.check_key(building.id) {
             true => {}
             false => {
-                self.realloc(Building::SPACE, payer, system_program)?;
+                self.realloc(
+                    ReallocAction::Increase,
+                    Building::SPACE,
+                    payer,
+                    system_program,
+                )?;
                 self.buildings.push(building)
             }
         }
         Ok(())
     }
 
+    fn withdraw_building(
+        &mut self,
+        payer: &Signer<'info>,
+        building_id: Pubkey,
+        system_program: &Program<'info, System>,
+    ) -> Result<()> {
+        match self.check_key(building_id) {
+            true => {
+                self.realloc(
+                    ReallocAction::Decrease,
+                    Building::SPACE,
+                    payer,
+                    system_program,
+                )?;
+                self.buildings.retain(|building| building.id != building_id)
+            }
+            false => {}
+        }
+        Ok(())
+    }
+
     fn realloc(
         &mut self,
+        action: ReallocAction,
         space_to_add: usize,
         payer: &Signer<'info>,
         system_program: &Program<'info, System>,
     ) -> Result<()> {
         let account_info = self.to_account_info();
-        let new_account_size = account_info.data_len() + space_to_add;
 
-        //determine additional rent
-        let lamport_required = (Rent::get())?.minimum_balance(new_account_size);
-        let additional_rent_to_pay = lamport_required - account_info.lamports();
+        match action {
+            ReallocAction::Increase => {
+                // transfer into pool account
+                let new_account_size = account_info.data_len() + space_to_add;
+                let lamport_required = (Rent::get())?.minimum_balance(new_account_size);
+                let additional_rent_to_pay: u64 = lamport_required - account_info.lamports();
+                transfer_lamports(
+                    payer,
+                    account_info.clone(),
+                    additional_rent_to_pay,
+                    system_program,
+                )?;
+                account_info.realloc(new_account_size, false)?;
+            }
+            ReallocAction::Decrease => {
+                // transfer out of pool account
+                let new_account_size = account_info.data_len() - space_to_add;
+                let rent_to_withdraw = (Rent::get())?.minimum_balance(Building::SPACE);
+                transfer_out_lamports(
+                    account_info.to_account_info(),
+                    payer.to_account_info(),
+                    rent_to_withdraw,
+                    system_program,
+                )?;
+                account_info.realloc(new_account_size, false)?;
+            }
+        }
 
-        //make payment
-        system_program::transfer(
-            CpiContext::new(
-                system_program.to_account_info(),
-                system_program::Transfer {
-                    from: payer.to_account_info(),
-                    to: account_info.clone(),
-                },
-            ),
-            additional_rent_to_pay,
-        )?;
-
-        account_info.realloc(new_account_size, false)?;
         Ok(())
     }
+}
+
+fn transfer_lamports<'info>(
+    from: &Signer<'info>,
+    to: AccountInfo<'info>,
+    amount: u64,
+    system_program: &Program<'info, System>,
+) -> Result<()> {
+    system_program::transfer(
+        CpiContext::new(
+            system_program.to_account_info(),
+            system_program::Transfer {
+                from: from.to_account_info(),
+                to: to.to_account_info(),
+            },
+        ),
+        amount,
+    )
+}
+
+fn transfer_out_lamports<'info>(
+    from: AccountInfo<'info>,
+    to: AccountInfo<'info>,
+    amount: u64,
+    system_program: &Program<'info, System>,
+) -> Result<()> {
+    let signer: &[&[&[u8]]] = &[&[Town::SEED_PREFIX.as_bytes()]];
+
+    system_program::transfer(
+        CpiContext::new_with_signer(
+            system_program.to_account_info(),
+            system_program::Transfer { from, to },
+            signer,
+        ),
+        amount,
+    )
+}
+
+pub enum ReallocAction {
+    Increase,
+    Decrease,
 }
