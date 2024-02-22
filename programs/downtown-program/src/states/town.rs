@@ -1,3 +1,4 @@
+use crate::constants::constants;
 use crate::states::custom_error::CustomError;
 use crate::states::Building;
 use anchor_lang::prelude::*;
@@ -29,6 +30,7 @@ pub trait TownAccount<'info> {
         &mut self,
         payer: &Signer<'info>,
         building: Building,
+        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()>;
 
@@ -36,6 +38,7 @@ pub trait TownAccount<'info> {
         &mut self,
         payer: &Signer<'info>,
         building_id: Pubkey,
+        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()>;
 
@@ -44,6 +47,7 @@ pub trait TownAccount<'info> {
         action: ReallocAction,
         space_to_add: usize,
         payer: &Signer<'info>,
+        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()>;
 }
@@ -71,6 +75,7 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
         &mut self,
         payer: &Signer<'info>,
         building: Building,
+        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()> {
         match self.check_key(building.id) {
@@ -80,6 +85,7 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
                     ReallocAction::Increase,
                     Building::SPACE,
                     payer,
+                    bump,
                     system_program,
                 )?;
                 self.buildings.push(building)
@@ -92,6 +98,7 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
         &mut self,
         payer: &Signer<'info>,
         building_id: Pubkey,
+        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()> {
         match self.check_key(building_id) {
@@ -100,6 +107,7 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
                     ReallocAction::Decrease,
                     Building::SPACE,
                     payer,
+                    bump,
                     system_program,
                 )?;
                 self.buildings.retain(|building| building.id != building_id)
@@ -114,6 +122,7 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
         action: ReallocAction,
         space_to_add: usize,
         payer: &Signer<'info>,
+        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()> {
         let account_info = self.to_account_info();
@@ -137,9 +146,10 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
                 let new_account_size = account_info.data_len() - space_to_add;
                 let rent_to_withdraw = (Rent::get())?.minimum_balance(Building::SPACE);
                 transfer_out_lamports(
-                    account_info.to_account_info(),
+                    account_info.clone(),
                     payer.to_account_info(),
                     rent_to_withdraw,
+                    bump,
                     system_program,
                 )?;
                 account_info.realloc(new_account_size, false)?;
@@ -172,9 +182,10 @@ fn transfer_out_lamports<'info>(
     from: AccountInfo<'info>,
     to: AccountInfo<'info>,
     amount: u64,
+    bump: u8,
     system_program: &Program<'info, System>,
 ) -> Result<()> {
-    let signer: &[&[&[u8]]] = &[&[Town::SEED_PREFIX.as_bytes()]];
+    let signer: &[&[&[u8]]] = &[&[constants::TOWN, &[bump]]];
 
     system_program::transfer(
         CpiContext::new_with_signer(

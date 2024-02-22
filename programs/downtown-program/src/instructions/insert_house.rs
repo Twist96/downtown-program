@@ -32,7 +32,12 @@ pub fn insert_house_(
         scale,
     };
     let town = &mut ctx.accounts.town;
-    town.insert_building(&ctx.accounts.signer, building, &ctx.accounts.system_program)?;
+    town.insert_building(
+        &ctx.accounts.signer,
+        building,
+        ctx.bumps.town,
+        &ctx.accounts.system_program,
+    )?;
 
     msg!("building numbers: {}", ctx.accounts.town.buildings.len());
     return Ok(());

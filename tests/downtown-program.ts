@@ -16,7 +16,7 @@ describe("downtown-program", () => {
       program.programId
   )
 
-  it("Create Town", async () => {
+  it.skip("Create Town", async () => {
     const townName = "Downtown"
     const tx = await program.methods
         .createTown(townName)
@@ -25,14 +25,13 @@ describe("downtown-program", () => {
         .rpc();
 
     const town = await program.account.town.fetch(townAddress)
-    console.log({town})
+    console.log({tx_createTown: tx, town})
     assert(town.name === townName, `wrong name found: ${town.name}`)
     assert(town.buildings.length === 0, "No building should be found")
   });
 
-  it("Add house", async () => {
+  it("should insert house", async () => {
     const initTown = await program.account.town.fetch(townAddress)
-    console.log({initTown})
     let positionX = new anchor.BN(0)
     let nft = new PublicKey("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
 
@@ -41,13 +40,26 @@ describe("downtown-program", () => {
         .accounts({signer: payer.publicKey, town: townAddress, nft: nft})
         .rpc()
 
-    console.log("Your transaction signature", tx);
     const town = await program.account.town.fetch(townAddress)
-    console.log({town})
-    console.assert(town.buildings.length === initTown.buildings.length + 1, "House was not added")
+    console.log({tx_INSERT_HOUSE: tx, town})
+    assert(town.buildings.length === initTown.buildings.length + 1, "House was not added")
   })
 
-  it.only("Get town details", async () => {
+  it('should remove house', async () => {
+    const initTown = await program.account.town.fetch(townAddress)
+    let nft = new PublicKey("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
+
+    const tx = await program.methods
+        .withdrawHouse("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
+        .accounts({signer: payer.publicKey, town: townAddress, nft: nft})
+        .rpc()
+
+    const town = await program.account.town.fetch(townAddress)
+    console.log({tx_REMOVE_HOUSE : tx, town})
+    assert(town.buildings.length === initTown.buildings.length - 1, "House was not removed")
+  });
+
+  it.skip("Get town details", async () => {
     const initTown = await program.account.town.fetch(townAddress)
     console.log({town_name: initTown.name})
     let buildings = initTown.buildings

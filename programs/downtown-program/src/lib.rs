@@ -6,7 +6,7 @@ mod states;
 use crate::instructions::*;
 use anchor_lang::prelude::*;
 
-declare_id!("EYY8UALu2JGiP5RmTACC5HBP8UbLzFEX4xEg3rEQPo1j");
+declare_id!("GgcDPuATxQ5BAcugtFXfY4qCYh75v32SCjkG2h7Yryjs");
 
 #[program]
 pub mod downtown_program {

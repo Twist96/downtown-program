@@ -21,7 +21,12 @@ pub struct WithdrawHouse<'info> {
 
 pub fn withdraw_house_(ctx: Context<WithdrawHouse>, house_id: Pubkey) -> Result<()> {
     let town = &mut ctx.accounts.town;
-    town.withdraw_building(&ctx.accounts.signer, house_id, &ctx.accounts.system_program)?;
+    town.withdraw_building(
+        &ctx.accounts.signer,
+        house_id,
+        ctx.bumps.town,
+        &ctx.accounts.system_program,
+    )?;
 
     msg!("building numbers: {}", ctx.accounts.town.buildings.len());
     return Ok(());
