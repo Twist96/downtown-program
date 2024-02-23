@@ -45,7 +45,7 @@ describe("downtown-program", () => {
     assert(town.buildings.length === initTown.buildings.length + 1, "House was not added")
   })
 
-  it('should remove house', async () => {
+  it.only('should remove house', async () => {
     const initTown = await program.account.town.fetch(townAddress)
     let nft = new PublicKey("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
 

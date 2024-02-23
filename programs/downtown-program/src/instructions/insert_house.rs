@@ -1,7 +1,8 @@
 use crate::constants::*;
 use crate::states::{Building, Town, TownAccount, Vector3D};
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
+use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(Accounts)]
 pub struct InsertHouse<'info> {
@@ -14,9 +15,25 @@ pub struct InsertHouse<'info> {
         bump,
     )]
     town: Account<'info, Town>,
-    nft: Account<'info, Mint>,
 
-    pub system_program: Program<'info, System>,
+    #[account(
+        init_if_needed,
+        payer = signer,
+        associated_token::mint = nft_mint,
+        associated_token::authority = signer
+    )]
+    user_nft_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        associated_token::mint = nft_mint,
+        associated_token::authority = signer
+    )]
+    nft_token_account: Account<'info, TokenAccount>,
+    nft_mint: Account<'info, Mint>,
+
+    system_program: Program<'info, System>,
+    token_program: Program<'info, Token>,
+    associated_token_program: Program<'info, AssociatedToken>,
 }
 
 pub fn insert_house_(
@@ -26,7 +43,7 @@ pub fn insert_house_(
     scale: Vector3D,
 ) -> Result<()> {
     let building = Building {
-        id: ctx.accounts.nft.key(),
+        id: ctx.accounts.nft_mint.key(),
         house_variant,
         position,
         scale,
@@ -34,9 +51,12 @@ pub fn insert_house_(
     let town = &mut ctx.accounts.town;
     town.insert_building(
         &ctx.accounts.signer,
+        &ctx.accounts.user_nft_token_account,
+        &ctx.accounts.nft_token_account,
         building,
         ctx.bumps.town,
         &ctx.accounts.system_program,
+        &ctx.accounts.token_program,
     )?;
 
     msg!("building numbers: {}", ctx.accounts.town.buildings.len());

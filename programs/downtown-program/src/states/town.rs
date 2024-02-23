@@ -3,6 +3,7 @@ use crate::states::custom_error::CustomError;
 use crate::states::Building;
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
+use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
 
 #[account]
 pub struct Town {
@@ -29,9 +30,12 @@ pub trait TownAccount<'info> {
     fn insert_building(
         &mut self,
         payer: &Signer<'info>,
+        user_nft_token_account: &Account<'info, TokenAccount>,
+        nft_token_account: &Account<'info, TokenAccount>,
         building: Building,
         bump: u8,
         system_program: &Program<'info, System>,
+        token_program: &Program<'info, Token>,
     ) -> Result<()>;
 
     fn withdraw_building(
@@ -74,9 +78,12 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
     fn insert_building(
         &mut self,
         payer: &Signer<'info>,
+        user_nft_token_account: &Account<'info, TokenAccount>,
+        nft_token_account: &Account<'info, TokenAccount>,
         building: Building,
         bump: u8,
         system_program: &Program<'info, System>,
+        token_program: &Program<'info, Token>,
     ) -> Result<()> {
         match self.check_key(building.id) {
             true => {}
@@ -88,7 +95,17 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
                     bump,
                     system_program,
                 )?;
-                self.buildings.push(building)
+                self.buildings.push(building);
+
+                // Deposit NFT
+                transfer_token(
+                    user_nft_token_account,
+                    nft_token_account,
+                    payer,
+                    1,
+                    token_program,
+                )?;
+                ()
             }
         }
         Ok(())
@@ -96,20 +113,20 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
 
     fn withdraw_building(
         &mut self,
-        payer: &Signer<'info>,
+        _payer: &Signer<'info>,
         building_id: Pubkey,
-        bump: u8,
-        system_program: &Program<'info, System>,
+        _bump: u8,
+        _system_program: &Program<'info, System>,
     ) -> Result<()> {
         match self.check_key(building_id) {
             true => {
-                self.realloc(
-                    ReallocAction::Decrease,
-                    Building::SPACE,
-                    payer,
-                    bump,
-                    system_program,
-                )?;
+                // self.realloc(
+                //     ReallocAction::Decrease,
+                //     Building::SPACE,
+                //     payer,
+                //     bump,
+                //     system_program,
+                // )?;
                 self.buildings.retain(|building| building.id != building_id)
             }
             false => {}
@@ -158,6 +175,26 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
 
         Ok(())
     }
+}
+
+fn transfer_token<'info>(
+    from: &Account<'info, TokenAccount>,
+    to: &Account<'info, TokenAccount>,
+    authority: &Signer<'info>,
+    amount: u64,
+    token_program: &Program<'info, Token>,
+) -> Result<()> {
+    transfer(
+        CpiContext::new(
+            token_program.to_account_info(),
+            Transfer {
+                from: from.to_account_info(),
+                to: to.to_account_info(),
+                authority: authority.to_account_info(),
+            },
+        ),
+        amount,
+    )
 }
 
 fn transfer_lamports<'info>(
