@@ -41,9 +41,12 @@ pub trait TownAccount<'info> {
     fn withdraw_building(
         &mut self,
         payer: &Signer<'info>,
+        user_nft_token_account: &Account<'info, TokenAccount>,
+        nft_token_account: &Account<'info, TokenAccount>,
         building_id: Pubkey,
         bump: u8,
         system_program: &Program<'info, System>,
+        token_program: &Program<'info, Token>,
     ) -> Result<()>;
 
     fn realloc(
@@ -114,9 +117,12 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
     fn withdraw_building(
         &mut self,
         _payer: &Signer<'info>,
+        user_nft_token_account: &Account<'info, TokenAccount>,
+        nft_token_account: &Account<'info, TokenAccount>,
         building_id: Pubkey,
         _bump: u8,
         _system_program: &Program<'info, System>,
+        token_program: &Program<'info, Token>,
     ) -> Result<()> {
         match self.check_key(building_id) {
             true => {
@@ -127,7 +133,14 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
                 //     bump,
                 //     system_program,
                 // )?;
-                self.buildings.retain(|building| building.id != building_id)
+                self.buildings.retain(|building| building.id != building_id);
+                transfer_lamports_from_vault(
+                    nft_token_account,
+                    user_nft_token_account,
+                    token_program,
+                    1,
+                )?;
+                ()
             }
             false => {}
         }
@@ -192,6 +205,28 @@ fn transfer_token<'info>(
                 to: to.to_account_info(),
                 authority: authority.to_account_info(),
             },
+        ),
+        amount,
+    )
+}
+
+fn transfer_lamports_from_vault<'info>(
+    from: &Account<'info, TokenAccount>,
+    to: &Account<'info, TokenAccount>,
+    token_program: &Program<'info, Token>,
+    amount: u64,
+) -> Result<()> {
+    let signer: &[&[&[u8]]] = &[&[]];
+
+    transfer(
+        CpiContext::new_with_signer(
+            token_program.to_account_info(),
+            Transfer {
+                from: from.to_account_info(),
+                to: to.to_account_info(),
+                authority: from.to_account_info(),
+            },
+            signer,
         ),
         amount,
     )
