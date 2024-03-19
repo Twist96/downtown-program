@@ -29,9 +29,11 @@ pub trait TownAccount<'info> {
 
     fn insert_building(
         &mut self,
-        payer: &Signer<'info>,
-        user_nft_token_account: &Account<'info, TokenAccount>,
-        nft_token_account: &Account<'info, TokenAccount>,
+        deposit: (
+            &Account<'info, TokenAccount>,
+            &Account<'info, TokenAccount>,
+            &Signer<'info>,
+        ),
         building: Building,
         bump: u8,
         system_program: &Program<'info, System>,
@@ -80,34 +82,32 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
 
     fn insert_building(
         &mut self,
-        payer: &Signer<'info>,
-        user_nft_token_account: &Account<'info, TokenAccount>,
-        nft_token_account: &Account<'info, TokenAccount>,
+        deposit: (
+            &Account<'info, TokenAccount>,
+            &Account<'info, TokenAccount>,
+            &Signer<'info>,
+        ),
         building: Building,
         bump: u8,
         system_program: &Program<'info, System>,
         token_program: &Program<'info, Token>,
     ) -> Result<()> {
+        let (user_nft_ata, nft_vault, signer) = deposit;
+
         match self.check_key(building.id) {
             true => {}
             false => {
                 self.realloc(
                     ReallocAction::Increase,
                     Building::SPACE,
-                    payer,
+                    signer,
                     bump,
                     system_program,
                 )?;
                 self.buildings.push(building);
 
                 // Deposit NFT
-                transfer_token(
-                    user_nft_token_account,
-                    nft_token_account,
-                    payer,
-                    1,
-                    token_program,
-                )?;
+                transfer_token(user_nft_ata, nft_vault, signer, 1, token_program)?;
                 ()
             }
         }

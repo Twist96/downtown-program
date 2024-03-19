@@ -22,13 +22,17 @@ pub struct InsertHouse<'info> {
         associated_token::mint = nft_mint,
         associated_token::authority = signer
     )]
-    user_nft_token_account: Account<'info, TokenAccount>,
+    user_nft_ata: Account<'info, TokenAccount>,
+
     #[account(
-        mut,
-        associated_token::mint = nft_mint,
-        associated_token::authority = signer
+        init_if_needed,
+        payer = signer,
+        seeds = [constants::VAULT, nft_mint.key().as_ref()],
+        bump,
+        token::mint = nft_mint,
+        token::authority = nft_vault
     )]
-    nft_token_account: Account<'info, TokenAccount>,
+    nft_vault: Account<'info, TokenAccount>,
     nft_mint: Account<'info, Mint>,
 
     system_program: Program<'info, System>,
@@ -50,9 +54,11 @@ pub fn insert_house_(
     };
     let town = &mut ctx.accounts.town;
     town.insert_building(
-        &ctx.accounts.signer,
-        &ctx.accounts.user_nft_token_account,
-        &ctx.accounts.nft_token_account,
+        (
+            &ctx.accounts.user_nft_ata,
+            &ctx.accounts.nft_vault,
+            &ctx.accounts.signer,
+        ),
         building,
         ctx.bumps.town,
         &ctx.accounts.system_program,
