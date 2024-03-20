@@ -84,13 +84,13 @@ describe("downtown-program", () => {
     // console.log("Mint success")
   });
 
-  it.only("should insert house", async () => {
+  it("should insert house", async () => {
     const initTown = await program.account.town.fetch(townAddress)
     let positionX = new anchor.BN(0)
     let nft = mintKeypair.publicKey
     let user_nft_ata = (await getATA(nft, payer.publicKey)).address
     let [nftVault] = getVault(nft)
-    console.log({nftVault, townAddress, nft})
+    // console.log({nftVault, townAddress, nft})
 
     //await mint(mintKeypair.publicKey, user_nft_ata)
 
@@ -104,14 +104,21 @@ describe("downtown-program", () => {
     assert(town.buildings.length === initTown.buildings.length + 1, "House was not added")
   })
 
-  it('should remove house', async () => {
+  it.only('should remove house', async () => {
     const initTown = await program.account.town.fetch(townAddress)
-    let nft = new PublicKey("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
+    let nft = mintKeypair.publicKey
+    let user_nft_ata = (await getATA(nft, payer.publicKey)).address
+    let [nftVault] = getVault(nft)
 
     const tx = await program.methods
-        .withdrawHouse("DWDRomhCxYJhodb5vbYeYGZpLTSC9CFpoUEZ8W4CGaYd")
-        .accounts({signer: payer.publicKey, town: townAddress})
-        .rpc()
+        .withdrawHouse()
+        .accounts({
+          signer: payer.publicKey,
+          town: townAddress,
+          userNftAta: user_nft_ata,
+          nftMint: nft,
+          nftVault: nftVault
+        }).rpc()
 
     const town = await program.account.town.fetch(townAddress)
     console.log({tx_REMOVE_HOUSE : tx, town})

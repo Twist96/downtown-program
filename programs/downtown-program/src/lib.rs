@@ -1,4 +1,3 @@
-use std::str::FromStr;
 mod constants;
 mod instructions;
 mod states;
@@ -30,8 +29,7 @@ pub mod downtown_program {
         insert_house_(ctx, house_variant, position, scale)
     }
 
-    pub fn withdraw_house(ctx: Context<WithdrawHouse>, house_id: String) -> Result<()> {
-        let public_key = Pubkey::from_str(&house_id);
-        withdraw_house_(ctx, public_key.unwrap().key())
+    pub fn withdraw_house(ctx: Context<WithdrawHouse>) -> Result<()> {
+        withdraw_house_(ctx)
     }
 }

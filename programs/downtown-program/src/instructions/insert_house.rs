@@ -48,6 +48,7 @@ pub fn insert_house_(
 ) -> Result<()> {
     let building = Building {
         id: ctx.accounts.nft_mint.key(),
+        owner: ctx.accounts.signer.key(),
         house_variant,
         position,
         scale,
@@ -60,7 +61,6 @@ pub fn insert_house_(
             &ctx.accounts.signer,
         ),
         building,
-        ctx.bumps.town,
         &ctx.accounts.system_program,
         &ctx.accounts.token_program,
     )?;

@@ -22,13 +22,14 @@ pub struct WithdrawHouse<'info> {
     associated_token::mint = nft_mint,
     associated_token::authority = signer
     )]
-    user_nft_token_account: Account<'info, TokenAccount>,
+    user_nft_ata: Account<'info, TokenAccount>,
+
     #[account(
     mut,
-    associated_token::mint = nft_mint,
-    associated_token::authority = signer
+    token::mint = nft_mint,
+    token::authority = signer
     )]
-    nft_token_account: Account<'info, TokenAccount>,
+    nft_vault: Account<'info, TokenAccount>,
     nft_mint: Account<'info, Mint>,
 
     system_program: Program<'info, System>,
@@ -36,15 +37,22 @@ pub struct WithdrawHouse<'info> {
     associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn withdraw_house_<'info>(ctx: Context<WithdrawHouse>, house_id: Pubkey) -> Result<()> {
+pub fn withdraw_house_<'info>(ctx: Context<WithdrawHouse>) -> Result<()> {
     let town = &mut ctx.accounts.town;
-    town.withdraw_building(
+    let withdrawal = (
+        &ctx.accounts.nft_vault,
+        &ctx.accounts.user_nft_ata,
         &ctx.accounts.signer,
-        &ctx.accounts.user_nft_token_account,
-        &ctx.accounts.nft_token_account,
-        house_id,
+    );
+    let withdraw_token = (
+        &ctx.accounts.nft_vault,
+        &ctx.accounts.user_nft_ata,
         ctx.bumps.town,
-        &ctx.accounts.system_program,
+    );
+    town.withdraw_building(
+        withdrawal,
+        withdraw_token,
+        &ctx.accounts.nft_mint,
         &ctx.accounts.token_program,
     )?;
 

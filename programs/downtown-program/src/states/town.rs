@@ -1,9 +1,9 @@
-use crate::constants::constants;
+use crate::constants::*;
 use crate::states::custom_error::CustomError;
 use crate::states::Building;
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 
 #[account]
 pub struct Town {
@@ -35,30 +35,34 @@ pub trait TownAccount<'info> {
             &Signer<'info>,
         ),
         building: Building,
-        bump: u8,
         system_program: &Program<'info, System>,
         token_program: &Program<'info, Token>,
     ) -> Result<()>;
 
     fn withdraw_building(
         &mut self,
-        payer: &Signer<'info>,
-        user_nft_token_account: &Account<'info, TokenAccount>,
-        nft_token_account: &Account<'info, TokenAccount>,
-        building_id: Pubkey,
-        bump: u8,
-        system_program: &Program<'info, System>,
+        withdraw_lamport: (
+            &Account<'info, TokenAccount>,
+            &Account<'info, TokenAccount>,
+            &Signer<'info>,
+        ),
+        withdraw_token: (
+            &Account<'info, TokenAccount>,
+            &Account<'info, TokenAccount>,
+            u8,
+        ),
+        nft: &Account<'info, Mint>,
         token_program: &Program<'info, Token>,
     ) -> Result<()>;
 
     fn realloc(
         &mut self,
-        action: ReallocAction,
         space_to_add: usize,
         payer: &Signer<'info>,
-        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()>;
+
+    fn dealloc(&mut self, sol_receiver: &Signer<'info>, space_to_deduct: usize) -> Result<()>;
 }
 
 impl<'info> TownAccount<'info> for Account<'info, Town> {
@@ -88,7 +92,6 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
             &Signer<'info>,
         ),
         building: Building,
-        bump: u8,
         system_program: &Program<'info, System>,
         token_program: &Program<'info, Token>,
     ) -> Result<()> {
@@ -97,13 +100,7 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
         match self.check_key(building.id) {
             true => {}
             false => {
-                self.realloc(
-                    ReallocAction::Increase,
-                    Building::SPACE,
-                    signer,
-                    bump,
-                    system_program,
-                )?;
+                self.realloc(Building::SPACE, signer, system_program)?;
                 self.buildings.push(building);
 
                 // Deposit NFT
@@ -116,30 +113,39 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
 
     fn withdraw_building(
         &mut self,
-        _payer: &Signer<'info>,
-        user_nft_token_account: &Account<'info, TokenAccount>,
-        nft_token_account: &Account<'info, TokenAccount>,
-        building_id: Pubkey,
-        _bump: u8,
-        _system_program: &Program<'info, System>,
+        withdraw_lamport: (
+            &Account<'info, TokenAccount>,
+            &Account<'info, TokenAccount>,
+            &Signer<'info>,
+        ),
+        withdraw_token: (
+            &Account<'info, TokenAccount>,
+            &Account<'info, TokenAccount>,
+            u8,
+        ),
+        nft: &Account<'info, Mint>,
         token_program: &Program<'info, Token>,
     ) -> Result<()> {
-        match self.check_key(building_id) {
+        let (from, to, signer) = withdraw_lamport;
+        let building = self._get_building(nft.key())?;
+
+        if building.owner.eq(signer.key) {
+            return Err(CustomError::UnauthorizedSigner.into());
+        }
+
+        match self.check_key(nft.key()) {
             true => {
-                // self.realloc(
-                //     ReallocAction::Decrease,
-                //     Building::SPACE,
-                //     payer,
-                //     bump,
-                //     system_program,
-                // )?;
-                self.buildings.retain(|building| building.id != building_id);
-                transfer_lamports_from_vault(
-                    nft_token_account,
-                    user_nft_token_account,
-                    token_program,
-                    1,
-                )?;
+                //remove building from list
+                self.buildings.retain(|building| building.id != nft.key());
+
+                //transfer lamports out
+                transfer_lamports_from_vault(from, to, token_program, 1)?;
+                self.dealloc(signer, Building::SPACE)?;
+
+                let (from, to, bump) = withdraw_token;
+                //transfer asset
+                let signer: &[&[&[u8]]] = &[&[constants::VAULT, &[bump]]];
+                transfer_token_from_program(from, to, signer, token_program)?;
                 ()
             }
             false => {}
@@ -149,45 +155,50 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
 
     fn realloc(
         &mut self,
-        action: ReallocAction,
         space_to_add: usize,
         payer: &Signer<'info>,
-        bump: u8,
         system_program: &Program<'info, System>,
     ) -> Result<()> {
         let account_info = self.to_account_info();
 
-        match action {
-            ReallocAction::Increase => {
-                // transfer into pool account
-                let new_account_size = account_info.data_len() + space_to_add;
-                let lamport_required = (Rent::get())?.minimum_balance(new_account_size);
-                let additional_rent_to_pay: u64 = lamport_required - account_info.lamports();
-                transfer_lamports(
-                    payer,
-                    account_info.clone(),
-                    additional_rent_to_pay,
-                    system_program,
-                )?;
-                account_info.realloc(new_account_size, false)?;
-            }
-            ReallocAction::Decrease => {
-                // transfer out of pool account
-                let new_account_size = account_info.data_len() - space_to_add;
-                let rent_to_withdraw = (Rent::get())?.minimum_balance(Building::SPACE);
-                transfer_out_lamports(
-                    account_info.clone(),
-                    payer.to_account_info(),
-                    rent_to_withdraw,
-                    bump,
-                    system_program,
-                )?;
-                account_info.realloc(new_account_size, false)?;
-            }
-        }
+        let new_account_size = account_info.data_len() + space_to_add;
+        let lamport_required = (Rent::get())?.minimum_balance(new_account_size);
+        let additional_rent_to_pay: u64 = lamport_required - account_info.lamports();
+        transfer_lamports(
+            payer,
+            account_info.clone(),
+            additional_rent_to_pay,
+            system_program,
+        )?;
+        account_info.realloc(new_account_size, false)?;
 
         Ok(())
     }
+
+    fn dealloc(&mut self, sol_receiver: &Signer<'info>, space_to_deduct: usize) -> Result<()> {
+        //reduce size
+        let account_info = self.to_account_info();
+        let new_account_size = account_info.data_len() - space_to_deduct;
+        account_info.realloc(new_account_size, false)?;
+
+        //make withdrawal
+        let rent_to_withdraw = (Rent::get())?.minimum_balance(Building::SPACE);
+        transfer_lamport(&self.to_account_info(), sol_receiver, rent_to_withdraw)?;
+        Ok(())
+    }
+}
+
+fn transfer_lamport(
+    from_account: &AccountInfo,
+    to_account: &AccountInfo,
+    amount_of_lamports: u64,
+) -> Result<()> {
+    if **from_account.try_borrow_mut_lamports()? < amount_of_lamports {
+        return Err(CustomError::InsufficientVaultSol.into());
+    }
+    **from_account.try_borrow_mut_lamports()? -= amount_of_lamports;
+    **to_account.try_borrow_mut_lamports()? += amount_of_lamports;
+    Ok(())
 }
 
 fn transfer_token<'info>(
@@ -207,6 +218,28 @@ fn transfer_token<'info>(
             },
         ),
         amount,
+    )
+}
+
+fn transfer_token_from_program<'info>(
+    from: &Account<'info, TokenAccount>,
+    to: &Account<'info, TokenAccount>,
+    signer: &[&[&[u8]]],
+    token_program: &Program<'info, Token>,
+) -> Result<()> {
+    transfer(
+        CpiContext::new_with_signer(
+            token_program.to_account_info(),
+            {
+                Transfer {
+                    from: from.to_account_info(),
+                    to: to.to_account_info(),
+                    authority: from.to_account_info(),
+                }
+            },
+            signer,
+        ),
+        1,
     )
 }
 
@@ -248,28 +281,4 @@ fn transfer_lamports<'info>(
         ),
         amount,
     )
-}
-
-fn transfer_out_lamports<'info>(
-    from: AccountInfo<'info>,
-    to: AccountInfo<'info>,
-    amount: u64,
-    bump: u8,
-    system_program: &Program<'info, System>,
-) -> Result<()> {
-    let signer: &[&[&[u8]]] = &[&[constants::TOWN, &[bump]]];
-
-    system_program::transfer(
-        CpiContext::new_with_signer(
-            system_program.to_account_info(),
-            system_program::Transfer { from, to },
-            signer,
-        ),
-        amount,
-    )
-}
-
-pub enum ReallocAction {
-    Increase,
-    Decrease,
 }
