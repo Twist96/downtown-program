@@ -33,7 +33,7 @@ describe("downtown-program", () => {
         payer.payer,
         payer.publicKey,
         payer.publicKey,
-        9,
+        0,
         mintKeypair
     )
     console.log(mint)
@@ -80,8 +80,8 @@ describe("downtown-program", () => {
     assert(town.name === townName, `wrong name found: ${town.name}`)
     assert(town.buildings.length === 0, "No building should be found")
 
-    // await createMintToken()
-    // console.log("Mint success")
+    await createMintToken()
+    console.log("Mint success")
   });
 
   it("should insert house", async () => {
@@ -90,9 +90,9 @@ describe("downtown-program", () => {
     let nft = mintKeypair.publicKey
     let user_nft_ata = (await getATA(nft, payer.publicKey)).address
     let [nftVault] = getVault(nft)
-    // console.log({nftVault, townAddress, nft})
+    console.log({nftVault, townAddress, nft})
 
-    //await mint(mintKeypair.publicKey, user_nft_ata)
+    await mint(mintKeypair.publicKey, user_nft_ata)
 
     const tx = await program.methods
         .insertHouse(1, positionX, positionX, positionX)
@@ -109,6 +109,8 @@ describe("downtown-program", () => {
     let nft = mintKeypair.publicKey
     let user_nft_ata = (await getATA(nft, payer.publicKey)).address
     let [nftVault] = getVault(nft)
+
+    console.log({nft, nftVault})
 
     const tx = await program.methods
         .withdrawHouse()
@@ -133,7 +135,7 @@ describe("downtown-program", () => {
       console.log(building.id)
       console.log(building.position)
     }
-    console.log({town_building_count: initTown.buildings.length})
+    console.log({house: initTown.buildings[0]})
   })
 
 });

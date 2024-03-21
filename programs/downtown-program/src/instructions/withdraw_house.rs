@@ -1,5 +1,5 @@
-use crate::constants::*;
-use crate::states::{Town, TownAccount};
+use crate::states::*;
+use crate::utils::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Mint, Token, TokenAccount};
@@ -11,14 +11,15 @@ pub struct WithdrawHouse<'info> {
 
     #[account(
     mut,
-    seeds = [constants::TOWN],
+    seeds = [constants::seed_constants::TOWN],
     bump,
     )]
     town: Account<'info, Town>,
 
     #[account(
-    init_if_needed,
-    payer = signer,
+    // init_if_needed,
+    // payer = signer,
+    mut,
     associated_token::mint = nft_mint,
     associated_token::authority = signer
     )]
@@ -26,8 +27,8 @@ pub struct WithdrawHouse<'info> {
 
     #[account(
     mut,
-    token::mint = nft_mint,
-    token::authority = signer
+    seeds = [constants::seed_constants::VAULT, nft_mint.key().as_ref()],
+    bump
     )]
     nft_vault: Account<'info, TokenAccount>,
     nft_mint: Account<'info, Mint>,
@@ -39,18 +40,12 @@ pub struct WithdrawHouse<'info> {
 
 pub fn withdraw_house_<'info>(ctx: Context<WithdrawHouse>) -> Result<()> {
     let town = &mut ctx.accounts.town;
-    let withdrawal = (
-        &ctx.accounts.nft_vault,
-        &ctx.accounts.user_nft_ata,
-        &ctx.accounts.signer,
-    );
     let withdraw_token = (
         &ctx.accounts.nft_vault,
         &ctx.accounts.user_nft_ata,
-        ctx.bumps.town,
+        ctx.bumps.nft_vault,
     );
     town.withdraw_building(
-        withdrawal,
         withdraw_token,
         &ctx.accounts.nft_mint,
         &ctx.accounts.token_program,

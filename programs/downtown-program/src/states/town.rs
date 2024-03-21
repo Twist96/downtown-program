@@ -1,9 +1,7 @@
-use crate::constants::*;
-use crate::states::custom_error::CustomError;
-use crate::states::Building;
+use crate::states::*;
+use crate::utils::*;
 use anchor_lang::prelude::*;
-use anchor_lang::system_program;
-use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[account]
 pub struct Town {
@@ -41,12 +39,7 @@ pub trait TownAccount<'info> {
 
     fn withdraw_building(
         &mut self,
-        withdraw_lamport: (
-            &Account<'info, TokenAccount>,
-            &Account<'info, TokenAccount>,
-            &Signer<'info>,
-        ),
-        withdraw_token: (
+        withdraw_token_: (
             &Account<'info, TokenAccount>,
             &Account<'info, TokenAccount>,
             u8,
@@ -113,39 +106,33 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
 
     fn withdraw_building(
         &mut self,
-        withdraw_lamport: (
-            &Account<'info, TokenAccount>,
-            &Account<'info, TokenAccount>,
-            &Signer<'info>,
-        ),
-        withdraw_token: (
+        withdraw_token_: (
             &Account<'info, TokenAccount>,
             &Account<'info, TokenAccount>,
             u8,
         ),
-        nft: &Account<'info, Mint>,
+        nft_mint: &Account<'info, Mint>,
         token_program: &Program<'info, Token>,
     ) -> Result<()> {
-        let (from, to, signer) = withdraw_lamport;
-        let building = self._get_building(nft.key())?;
+        let (from, to, bump) = withdraw_token_;
 
-        if building.owner.eq(signer.key) {
-            return Err(CustomError::UnauthorizedSigner.into());
+        if from.amount != 1 {
+            return Err(CustomError::InsufficientVaultAsset.into());
         }
 
-        match self.check_key(nft.key()) {
+        match self.check_key(nft_mint.key()) {
             true => {
                 //remove building from list
-                self.buildings.retain(|building| building.id != nft.key());
+                self.buildings
+                    .retain(|building| building.id != nft_mint.key());
 
                 //transfer lamports out
-                transfer_lamports_from_vault(from, to, token_program, 1)?;
-                self.dealloc(signer, Building::SPACE)?;
+                // self.dealloc(signer, Building::SPACE)?;
 
-                let (from, to, bump) = withdraw_token;
                 //transfer asset
-                let signer: &[&[&[u8]]] = &[&[constants::VAULT, &[bump]]];
-                transfer_token_from_program(from, to, signer, token_program)?;
+                let nft_key = nft_mint.key();
+                let seed: &[&[&[u8]]] = &[&[VAULT, nft_key.as_ref(), &[bump]]];
+                withdraw_token(from, to, seed, token_program, 1)?;
                 ()
             }
             false => {}
@@ -183,12 +170,12 @@ impl<'info> TownAccount<'info> for Account<'info, Town> {
 
         //make withdrawal
         let rent_to_withdraw = (Rent::get())?.minimum_balance(Building::SPACE);
-        transfer_lamport(&self.to_account_info(), sol_receiver, rent_to_withdraw)?;
+        withdraw_lamport(&self.to_account_info(), sol_receiver, rent_to_withdraw)?;
         Ok(())
     }
 }
 
-fn transfer_lamport(
+fn withdraw_lamport(
     from_account: &AccountInfo,
     to_account: &AccountInfo,
     amount_of_lamports: u64,
@@ -199,86 +186,4 @@ fn transfer_lamport(
     **from_account.try_borrow_mut_lamports()? -= amount_of_lamports;
     **to_account.try_borrow_mut_lamports()? += amount_of_lamports;
     Ok(())
-}
-
-fn transfer_token<'info>(
-    from: &Account<'info, TokenAccount>,
-    to: &Account<'info, TokenAccount>,
-    authority: &Signer<'info>,
-    amount: u64,
-    token_program: &Program<'info, Token>,
-) -> Result<()> {
-    transfer(
-        CpiContext::new(
-            token_program.to_account_info(),
-            Transfer {
-                from: from.to_account_info(),
-                to: to.to_account_info(),
-                authority: authority.to_account_info(),
-            },
-        ),
-        amount,
-    )
-}
-
-fn transfer_token_from_program<'info>(
-    from: &Account<'info, TokenAccount>,
-    to: &Account<'info, TokenAccount>,
-    signer: &[&[&[u8]]],
-    token_program: &Program<'info, Token>,
-) -> Result<()> {
-    transfer(
-        CpiContext::new_with_signer(
-            token_program.to_account_info(),
-            {
-                Transfer {
-                    from: from.to_account_info(),
-                    to: to.to_account_info(),
-                    authority: from.to_account_info(),
-                }
-            },
-            signer,
-        ),
-        1,
-    )
-}
-
-fn transfer_lamports_from_vault<'info>(
-    from: &Account<'info, TokenAccount>,
-    to: &Account<'info, TokenAccount>,
-    token_program: &Program<'info, Token>,
-    amount: u64,
-) -> Result<()> {
-    let signer: &[&[&[u8]]] = &[&[]];
-
-    transfer(
-        CpiContext::new_with_signer(
-            token_program.to_account_info(),
-            Transfer {
-                from: from.to_account_info(),
-                to: to.to_account_info(),
-                authority: from.to_account_info(),
-            },
-            signer,
-        ),
-        amount,
-    )
-}
-
-fn transfer_lamports<'info>(
-    from: &Signer<'info>,
-    to: AccountInfo<'info>,
-    amount: u64,
-    system_program: &Program<'info, System>,
-) -> Result<()> {
-    system_program::transfer(
-        CpiContext::new(
-            system_program.to_account_info(),
-            system_program::Transfer {
-                from: from.to_account_info(),
-                to: to.to_account_info(),
-            },
-        ),
-        amount,
-    )
 }

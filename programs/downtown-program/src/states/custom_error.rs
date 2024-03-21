@@ -8,4 +8,6 @@ pub enum CustomError {
     InsufficientVaultSol,
     #[msg("Asset not owned by signer")]
     UnauthorizedSigner,
+    #[msg("Asset not present in vault")]
+    InsufficientVaultAsset,
 }

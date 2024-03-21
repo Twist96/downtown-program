@@ -1,5 +1,5 @@
-use crate::constants::*;
 use crate::states::{Building, Town, TownAccount, Vector3D};
+use crate::utils::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Mint, Token, TokenAccount};
@@ -11,7 +11,7 @@ pub struct InsertHouse<'info> {
 
     #[account(
         mut,
-        seeds = [constants::TOWN],
+        seeds = [constants::seed_constants::TOWN],
         bump,
     )]
     town: Account<'info, Town>,
@@ -27,7 +27,7 @@ pub struct InsertHouse<'info> {
     #[account(
         init_if_needed,
         payer = signer,
-        seeds = [constants::VAULT, nft_mint.key().as_ref()],
+        seeds = [constants::seed_constants::VAULT, nft_mint.key().as_ref()],
         bump,
         token::mint = nft_mint,
         token::authority = nft_vault
