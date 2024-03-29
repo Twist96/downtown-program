@@ -1,4 +1,5 @@
 mod create_town;
+mod fund_rent_vault;
 mod insert_house;
 mod withdraw_house;
 
