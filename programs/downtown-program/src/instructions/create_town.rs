@@ -18,7 +18,7 @@ pub struct CreateTown<'info> {
 
     system_program: Program<'info, System>,
 }
-pub fn create_town_(ctx: Context<CreateTown>, name: String) -> Result<()> {
+pub fn create_town(ctx: Context<CreateTown>, name: String) -> Result<()> {
     ctx.accounts.town.set_inner(Town::new(name));
     Ok(())
 }

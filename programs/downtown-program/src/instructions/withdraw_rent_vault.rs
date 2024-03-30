@@ -4,23 +4,20 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 
 #[derive(Accounts)]
-pub struct FundRentVault<'info> {
+pub struct WithdrawVault<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
     #[account(
-        init_if_needed,
-        payer = signer,
-        associated_token::mint = token_mint,
-        associated_token::authority = user_token_account
+    associated_token::mint = token_mint,
+    associated_token::authority = user_token_account
     )]
     pub user_token_account: Account<'info, TokenAccount>,
 
     #[account(
-    init_if_needed,
+    mut,
     seeds = [constants::seed_constants::VAULT, constants::seed_constants::RENT],
     bump,
-    payer = signer,
     token::mint = token_mint,
     token::authority = rent_vault
     )]
@@ -32,15 +29,18 @@ pub struct FundRentVault<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn fund_rent_vault(ctx: Context<FundRentVault>, amount: u64) -> Result<()> {
+pub fn withdraw_rent_vault(ctx: Context<WithdrawVault>, amount: u64) -> Result<()> {
+    let signer: &[&[&[u8]]] = &[&[VAULT, RENT, &[ctx.bumps.rent_vault]]];
+
     transfer(
-        CpiContext::new(
+        CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accounts.user_token_account.to_account_info(),
-                to: ctx.accounts.rent_vault.to_account_info(),
-                authority: ctx.accounts.signer.to_account_info(),
+                from: ctx.accounts.rent_vault.to_account_info(),
+                to: ctx.accounts.user_token_account.to_account_info(),
+                authority: ctx.accounts.rent_vault.to_account_info(),
             },
+            signer,
         ),
         amount,
     )

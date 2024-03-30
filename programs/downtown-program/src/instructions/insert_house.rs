@@ -40,7 +40,7 @@ pub struct InsertHouse<'info> {
     associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn insert_house_(
+pub fn insert_house(
     ctx: Context<InsertHouse>,
     house_variant: u8,
     position: Vector3D,

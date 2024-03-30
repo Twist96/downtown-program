@@ -2,8 +2,8 @@ mod instructions;
 mod states;
 mod utils;
 
-use crate::instructions::*;
 use anchor_lang::prelude::*;
+use instructions::*;
 
 declare_id!("CgGCmVn7W9zjKjAqw3ypEQfEEiJGSM1u87AzyEC81m5b");
 
@@ -13,7 +13,7 @@ pub mod downtown_program {
     use crate::states::Vector3D;
 
     pub fn create_town(ctx: Context<CreateTown>, name: String) -> Result<()> {
-        create_town_(ctx, name)
+        instructions::create_town(ctx, name)
     }
 
     pub fn insert_house(
@@ -26,10 +26,18 @@ pub mod downtown_program {
         let position = Vector3D::new(position_x, position_y, Some(position_z));
         let scale = Vector3D::new(0, 0, Some(0));
 
-        insert_house_(ctx, house_variant, position, scale)
+        instructions::insert_house(ctx, house_variant, position, scale)
     }
 
     pub fn withdraw_house(ctx: Context<WithdrawHouse>) -> Result<()> {
         withdraw_house_(ctx)
+    }
+
+    pub fn fund_rent_vault(ctx: Context<FundRentVault>, amount: u64) -> Result<()> {
+        instructions::fund_rent_vault(ctx, amount)
+    }
+
+    pub fn withdraw_rent_vault(ctx: Context<WithdrawVault>, amount: u64) -> Result<()> {
+        instructions::withdraw_rent_vault(ctx, amount)
     }
 }
