@@ -6,6 +6,8 @@ pub enum CustomError {
     BuildingNotFound,
     #[msg("Not enough sol in vault")]
     InsufficientVaultSol,
+    #[msg("Not enough tokens to pay rent")]
+    InsufficientRentVault,
     #[msg("Asset not owned by signer")]
     UnauthorizedSigner,
     #[msg("Asset not present in vault")]

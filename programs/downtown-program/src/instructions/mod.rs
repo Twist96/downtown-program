@@ -1,9 +1,11 @@
+mod claim_rent;
 mod create_town;
 mod fund_rent_vault;
 mod insert_house;
 mod withdraw_house;
 mod withdraw_rent_vault;
 
+pub use claim_rent::*;
 pub use create_town::*;
 pub use fund_rent_vault::*;
 pub use insert_house::*;

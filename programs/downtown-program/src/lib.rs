@@ -37,7 +37,11 @@ pub mod downtown_program {
         instructions::fund_rent_vault(ctx, amount)
     }
 
-    pub fn withdraw_rent_vault(ctx: Context<WithdrawVault>, amount: u64) -> Result<()> {
+    pub fn withdraw_rent_vault(ctx: Context<WithdrawRentVault>, amount: u64) -> Result<()> {
         instructions::withdraw_rent_vault(ctx, amount)
+    }
+
+    pub fn claim_rent(ctx: Context<ClaimRent>) -> Result<()> {
+        instructions::claim_rent(ctx)
     }
 }

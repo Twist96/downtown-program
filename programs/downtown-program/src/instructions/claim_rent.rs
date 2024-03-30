@@ -1,10 +1,11 @@
+use crate::states::{CustomError, Town, TownAccount};
 use crate::utils::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 
 #[derive(Accounts)]
-pub struct WithdrawRentVault<'info> {
+pub struct ClaimRent<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
@@ -23,6 +24,12 @@ pub struct WithdrawRentVault<'info> {
     )]
     pub rent_vault: Account<'info, TokenAccount>,
 
+    #[account(
+        seeds = [constants::seed_constants::TOWN],
+        bump,
+    )]
+    town: Account<'info, Town>,
+
     pub nft_mint: Account<'info, Mint>,
     pub token_mint: Account<'info, Mint>,
     pub system_program: Program<'info, System>,
@@ -30,7 +37,20 @@ pub struct WithdrawRentVault<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn withdraw_rent_vault(ctx: Context<WithdrawRentVault>, amount: u64) -> Result<()> {
+pub fn claim_rent(ctx: Context<ClaimRent>) -> Result<()> {
+    let property = ctx
+        .accounts
+        .town
+        ._get_building(ctx.accounts.nft_mint.key())?;
+    let clock = Clock::get()?;
+    let slot_diff = clock.slot - property.stake_slot;
+    let rent_total =
+        slot_diff * constants::general_constants::RENT_PER_SLOT * (property.house_variant as u64);
+
+    if rent_total > ctx.accounts.rent_vault.amount {
+        return Err(CustomError::InsufficientRentVault.into());
+    }
+
     let signer: &[&[&[u8]]] = &[&[VAULT, RENT, &[ctx.bumps.rent_vault]]];
 
     transfer(
@@ -43,6 +63,6 @@ pub fn withdraw_rent_vault(ctx: Context<WithdrawRentVault>, amount: u64) -> Resu
             },
             signer,
         ),
-        amount,
+        rent_total,
     )
 }
