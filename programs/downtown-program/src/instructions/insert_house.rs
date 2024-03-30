@@ -46,12 +46,14 @@ pub fn insert_house(
     position: Vector3D,
     scale: Vector3D,
 ) -> Result<()> {
+    let clock = Clock::get()?;
     let building = Building {
         id: ctx.accounts.nft_mint.key(),
         owner: ctx.accounts.signer.key(),
         house_variant,
         position,
         scale,
+        stake_slot: clock.slot,
     };
     let town = &mut ctx.accounts.town;
     town.insert_building(

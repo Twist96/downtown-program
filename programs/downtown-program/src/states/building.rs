@@ -8,6 +8,7 @@ pub struct Building {
     pub house_variant: u8,
     pub position: Vector3D,
     pub scale: Vector3D,
+    pub stake_slot: u64,
 }
 
 impl Building {
@@ -18,6 +19,7 @@ impl Building {
         house_variant: u8,
         position: Vector3D,
         scale: Vector3D,
+        stake_slot: u64,
     ) -> Self {
         Self {
             id,
@@ -25,6 +27,7 @@ impl Building {
             house_variant,
             position,
             scale,
+            stake_slot,
         }
     }
 }
