@@ -8,7 +8,7 @@ downtown_program = "9wdFi8qDABNVSST2tFq5iZ4tmQ8mxbXxSXbCcwt8TeGH"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "/Users/matthewchukwuemeka/.config/solana/id.json"
 
 [scripts]

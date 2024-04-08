@@ -64,8 +64,9 @@ namespace DowntownProgram
         {
             BuildingNotFound = 6000U,
             InsufficientVaultSol = 6001U,
-            UnauthorizedSigner = 6002U,
-            InsufficientVaultAsset = 6003U
+            InsufficientRentVault = 6002U,
+            UnauthorizedSigner = 6003U,
+            InsufficientVaultAsset = 6004U
         }
     }
 
@@ -83,6 +84,8 @@ namespace DowntownProgram
 
             public Vector3D Scale { get; set; }
 
+            public ulong StakeSlot { get; set; }
+
             public int Serialize(byte[] _data, int initialOffset)
             {
                 int offset = initialOffset;
@@ -94,6 +97,8 @@ namespace DowntownProgram
                 offset += 1;
                 offset += Position.Serialize(_data, offset);
                 offset += Scale.Serialize(_data, offset);
+                _data.WriteU64(StakeSlot, offset);
+                offset += 8;
                 return offset - initialOffset;
             }
 
@@ -111,6 +116,8 @@ namespace DowntownProgram
                 result.Position = resultPosition;
                 offset += Vector3D.Deserialize(_data, offset, out var resultScale);
                 result.Scale = resultScale;
+                result.StakeSlot = _data.GetU64(offset);
+                offset += 8;
                 return offset - initialOffset;
             }
         }
@@ -206,9 +213,27 @@ namespace DowntownProgram
             return await SignAndSendTransaction(instr, feePayer, signingCallback);
         }
 
+        public async Task<RequestResult<string>> SendFundRentVaultAsync(FundRentVaultAccounts accounts, ulong amount, PublicKey feePayer, Func<byte[], PublicKey, byte[]> signingCallback, PublicKey programId)
+        {
+            Solana.Unity.Rpc.Models.TransactionInstruction instr = Program.DowntownProgramProgram.FundRentVault(accounts, amount, programId);
+            return await SignAndSendTransaction(instr, feePayer, signingCallback);
+        }
+
+        public async Task<RequestResult<string>> SendWithdrawRentVaultAsync(WithdrawRentVaultAccounts accounts, ulong amount, PublicKey feePayer, Func<byte[], PublicKey, byte[]> signingCallback, PublicKey programId)
+        {
+            Solana.Unity.Rpc.Models.TransactionInstruction instr = Program.DowntownProgramProgram.WithdrawRentVault(accounts, amount, programId);
+            return await SignAndSendTransaction(instr, feePayer, signingCallback);
+        }
+
+        public async Task<RequestResult<string>> SendClaimRentAsync(ClaimRentAccounts accounts, PublicKey feePayer, Func<byte[], PublicKey, byte[]> signingCallback, PublicKey programId)
+        {
+            Solana.Unity.Rpc.Models.TransactionInstruction instr = Program.DowntownProgramProgram.ClaimRent(accounts, programId);
+            return await SignAndSendTransaction(instr, feePayer, signingCallback);
+        }
+
         protected override Dictionary<uint, ProgramError<DowntownProgramErrorKind>> BuildErrorsDictionary()
         {
-            return new Dictionary<uint, ProgramError<DowntownProgramErrorKind>>{{6000U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.BuildingNotFound, "House not found in town")}, {6001U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.InsufficientVaultSol, "Not enough sol in vault")}, {6002U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.UnauthorizedSigner, "Asset not owned by signer")}, {6003U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.InsufficientVaultAsset, "Asset not present in vault")}, };
+            return new Dictionary<uint, ProgramError<DowntownProgramErrorKind>>{{6000U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.BuildingNotFound, "House not found in town")}, {6001U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.InsufficientVaultSol, "Not enough sol in vault")}, {6002U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.InsufficientRentVault, "Not enough tokens to pay rent")}, {6003U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.UnauthorizedSigner, "Asset not owned by signer")}, {6004U, new ProgramError<DowntownProgramErrorKind>(DowntownProgramErrorKind.InsufficientVaultAsset, "Asset not present in vault")}, };
         }
     }
 
@@ -261,6 +286,63 @@ namespace DowntownProgram
             public PublicKey AssociatedTokenProgram { get; set; }
         }
 
+        public class FundRentVaultAccounts
+        {
+            public PublicKey Signer { get; set; }
+
+            public PublicKey UserTokenAccount { get; set; }
+
+            public PublicKey RentVault { get; set; }
+
+            public PublicKey TokenMint { get; set; }
+
+            public PublicKey SystemProgram { get; set; }
+
+            public PublicKey TokenProgram { get; set; }
+
+            public PublicKey AssociatedTokenProgram { get; set; }
+        }
+
+        public class WithdrawRentVaultAccounts
+        {
+            public PublicKey Signer { get; set; }
+
+            public PublicKey UserTokenAccount { get; set; }
+
+            public PublicKey RentVault { get; set; }
+
+            public PublicKey NftMint { get; set; }
+
+            public PublicKey TokenMint { get; set; }
+
+            public PublicKey SystemProgram { get; set; }
+
+            public PublicKey TokenProgram { get; set; }
+
+            public PublicKey AssociatedTokenProgram { get; set; }
+        }
+
+        public class ClaimRentAccounts
+        {
+            public PublicKey Signer { get; set; }
+
+            public PublicKey UserTokenAccount { get; set; }
+
+            public PublicKey RentVault { get; set; }
+
+            public PublicKey Town { get; set; }
+
+            public PublicKey NftMint { get; set; }
+
+            public PublicKey TokenMint { get; set; }
+
+            public PublicKey SystemProgram { get; set; }
+
+            public PublicKey TokenProgram { get; set; }
+
+            public PublicKey AssociatedTokenProgram { get; set; }
+        }
+
         public static class DowntownProgramProgram
         {
             public static Solana.Unity.Rpc.Models.TransactionInstruction CreateTown(CreateTownAccounts accounts, string name, PublicKey programId)
@@ -305,6 +387,49 @@ namespace DowntownProgram
                 byte[] _data = new byte[1200];
                 int offset = 0;
                 _data.WriteU64(10612423312654920930UL, offset);
+                offset += 8;
+                byte[] resultData = new byte[offset];
+                Array.Copy(_data, resultData, offset);
+                return new Solana.Unity.Rpc.Models.TransactionInstruction{Keys = keys, ProgramId = programId.KeyBytes, Data = resultData};
+            }
+
+            public static Solana.Unity.Rpc.Models.TransactionInstruction FundRentVault(FundRentVaultAccounts accounts, ulong amount, PublicKey programId)
+            {
+                List<Solana.Unity.Rpc.Models.AccountMeta> keys = new()
+                {Solana.Unity.Rpc.Models.AccountMeta.Writable(accounts.Signer, true), Solana.Unity.Rpc.Models.AccountMeta.Writable(accounts.UserTokenAccount, false), Solana.Unity.Rpc.Models.AccountMeta.Writable(accounts.RentVault, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.TokenMint, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.SystemProgram, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.TokenProgram, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.AssociatedTokenProgram, false)};
+                byte[] _data = new byte[1200];
+                int offset = 0;
+                _data.WriteU64(225003729026153972UL, offset);
+                offset += 8;
+                _data.WriteU64(amount, offset);
+                offset += 8;
+                byte[] resultData = new byte[offset];
+                Array.Copy(_data, resultData, offset);
+                return new Solana.Unity.Rpc.Models.TransactionInstruction{Keys = keys, ProgramId = programId.KeyBytes, Data = resultData};
+            }
+
+            public static Solana.Unity.Rpc.Models.TransactionInstruction WithdrawRentVault(WithdrawRentVaultAccounts accounts, ulong amount, PublicKey programId)
+            {
+                List<Solana.Unity.Rpc.Models.AccountMeta> keys = new()
+                {Solana.Unity.Rpc.Models.AccountMeta.Writable(accounts.Signer, true), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.UserTokenAccount, false), Solana.Unity.Rpc.Models.AccountMeta.Writable(accounts.RentVault, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.NftMint, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.TokenMint, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.SystemProgram, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.TokenProgram, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.AssociatedTokenProgram, false)};
+                byte[] _data = new byte[1200];
+                int offset = 0;
+                _data.WriteU64(3304478577311187558UL, offset);
+                offset += 8;
+                _data.WriteU64(amount, offset);
+                offset += 8;
+                byte[] resultData = new byte[offset];
+                Array.Copy(_data, resultData, offset);
+                return new Solana.Unity.Rpc.Models.TransactionInstruction{Keys = keys, ProgramId = programId.KeyBytes, Data = resultData};
+            }
+
+            public static Solana.Unity.Rpc.Models.TransactionInstruction ClaimRent(ClaimRentAccounts accounts, PublicKey programId)
+            {
+                List<Solana.Unity.Rpc.Models.AccountMeta> keys = new()
+                {Solana.Unity.Rpc.Models.AccountMeta.Writable(accounts.Signer, true), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.UserTokenAccount, false), Solana.Unity.Rpc.Models.AccountMeta.Writable(accounts.RentVault, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.Town, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.NftMint, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.TokenMint, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.SystemProgram, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.TokenProgram, false), Solana.Unity.Rpc.Models.AccountMeta.ReadOnly(accounts.AssociatedTokenProgram, false)};
+                byte[] _data = new byte[1200];
+                int offset = 0;
+                _data.WriteU64(7285246838288148793UL, offset);
                 offset += 8;
                 byte[] resultData = new byte[offset];
                 Array.Copy(_data, resultData, offset);

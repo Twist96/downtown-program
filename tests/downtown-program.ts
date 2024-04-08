@@ -139,3 +139,7 @@ describe("downtown-program", () => {
   })
 
 });
+
+
+//anchor idl init -f target/idl/downtown_program.json CgGCmVn7W9zjKjAqw3ypEQfEEiJGSM1u87AzyEC81m5b
+//Idl account created: 6A6P4HeCMFLugvStbahFkwWq8BKmW4URBpaTD52r1Zbo
